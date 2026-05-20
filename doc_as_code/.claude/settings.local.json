@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(gh:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "mcp__claude_ai_Atlassian__confluence_get_page",
+      "mcp__claude_ai_Atlassian__confluence_create_page",
+      "mcp__claude_ai_Atlassian__confluence_update_page",
+      "mcp__claude_ai_Atlassian__jira_get_issue",
+      "mcp__claude_ai_Atlassian__jira_create_issue",
+      "mcp__github__get_file_contents",
+      "mcp__github__search_code",
+      "mcp__github__list_commits",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs"
+    ]
+  }
+}
