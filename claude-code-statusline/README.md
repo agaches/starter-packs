@@ -43,18 +43,16 @@ chmod +x ~/.claude/statusline-command.sh
 
 ```json
 {
-  "statusCommand": "/Users/VOTRE_USER/.claude/statusline-command.sh"
+  "statusCommand": "$HOME/.claude/statusline-command.sh"
 }
 ```
-
-Remplacer `VOTRE_USER` par le résultat de `whoami`.
 
 **3. Tester sans relancer Claude Code**
 
 ```bash
 echo '{
   "model": {"display_name": "Claude Sonnet 4.6"},
-  "workspace": {"current_dir": "/Users/VOTRE_USER/monrepo"},
+  "workspace": {"current_dir": "$HOME/monrepo"},
   "effort": {"level": "normal"},
   "thinking": {"enabled": false},
   "context_window": {"used_percentage": 42, "context_window_size": 200000},
