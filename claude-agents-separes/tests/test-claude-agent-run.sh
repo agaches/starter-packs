@@ -28,4 +28,14 @@ hasnt herite_parent  "$(CLAUDECODE=1 ANTHROPIC_BASE_URL=http://x sh "$RUN" "x")"
 out=$(sh "$RUN" --thinking=extreme "x" 2>&1); rc=$?
 if [ $rc -eq 2 ]; then ok=$((ok+1)); else ko=$((ko+1)); echo "ÉCHEC thinking_invalide : rc=$rc « $out »"; fi
 
+# Contrat stdout : un faux claude (comme un shim de passerelle) écrit du texte après le JSON, code 3.
+printf '#!/bin/sh\necho "{\\"type\\":\\"result\\"}"\necho\necho "  Session ended. Bannière"\nexit 3\n' > "$T/bavard"
+chmod +x "$T/bavard"
+CLAUDE_AGENT_CLAUDE="$T/bavard" sh "$RUN" --output-format json "x" > "$T/o" 2> "$T/e"; rc=$?
+has   stdout_json_seul     "[$(cat "$T/o")]" '[{"type":"result"}]'
+has   banniere_sur_stderr  "$(cat "$T/e")"   "Session ended"
+has   code_retour_conserve "rc=$rc"          "rc=3"
+has   stream_json   "[$(CLAUDE_AGENT_CLAUDE="$T/bavard" sh "$RUN" --output-format=stream-json "x" 2>/dev/null)]" '[{"type":"result"}]'
+has   text_inchange "$(CLAUDE_AGENT_CLAUDE="$T/bavard" sh "$RUN" "x" 2>/dev/null)" "Session ended"
+
 echo "OK=$ok ÉCHECS=$ko"; [ $ko -eq 0 ]

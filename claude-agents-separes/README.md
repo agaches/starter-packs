@@ -16,7 +16,7 @@ Lancer des agents Claude Code en **processus séparés** depuis une session pilo
 
 | Fichier | Rôle |
 |---|---|
-| `bin/claude-agent-run` | Lanceur : `-p` forcé, `--agent` / `--thinking`, nettoyage de l'environnement hérité du pilote, compte choisi par variables |
+| `bin/claude-agent-run` | Lanceur : `-p` forcé, `--agent` / `--thinking`, nettoyage de l'environnement hérité du pilote, compte choisi par variables, stdout réservé à Claude Code |
 | `api/api-key-helper.sh` | `apiKeyHelper` : lit la clé dans un fichier en 600, jamais dans l'environnement |
 | `api/api-settings.example.json` | Settings qui branchent le helper |
 | `tests/test-claude-agent-run.sh` | Tests du lanceur avec un faux `claude` (aucun appel API) |
@@ -24,14 +24,14 @@ Lancer des agents Claude Code en **processus séparés** depuis une session pilo
 ## Prérequis
 
 - Claude Code ≥ 2.1.329 (options `--agent`, `--effort`, `--json-schema`, `--max-budget-usd`, `-w`)
-- POSIX sh, `git`
+- POSIX sh, `awk`, `git`
 - Pour le mode clé API : une clé Anthropic (console) dans un fichier
 
 ## Installation
 
 ```sh
 install -m 755 bin/claude-agent-run ~/.local/bin/
-sh tests/test-claude-agent-run.sh        # attendu : OK=14 ÉCHECS=0
+sh tests/test-claude-agent-run.sh        # attendu : OK=19 ÉCHECS=0
 ```
 
 ### Mode abonnement
@@ -96,6 +96,14 @@ claude-agent-run --agent=dev --model sonnet --max-budget-usd 2 \
 ```
 
 - Le pilote lit `structured_output` (statut, fichiers, blocage). Pas de JSON ou code ≠ 0 ⇒ échec, avec la fin de la sortie.
+
+### Contrat stdout
+
+- **stdout = sortie de Claude Code, rien d'autre** ; tout message du lanceur ou d'une passerelle va sur stderr.
+- Un pilote peut donc lire stdout comme un document JSON (`json.load`) sans tolérance.
+- `CLAUDE_AGENT_CLAUDE` (shim de passerelle) ne doit rien écrire sur stdout. Certains impriment une bannière de fin de session après la sortie de Claude Code.
+- Parade intégrée, en `--output-format json|stream-json` : le lanceur ne garde sur stdout que les lignes JSON (commençant par `{` ou `[`) et renvoie le reste sur stderr. Flux ligne à ligne, code retour de Claude Code conservé.
+- En `--output-format text` (défaut) : aucun filtre possible, la sortie passe telle quelle. Avec un shim bavard, utiliser `--output-format json` et lire `.result`, ou couper la bannière dans le shim s'il le permet.
 
 ## Points d'attention
 
