@@ -1,0 +1,68 @@
+#!/bin/sh
+# claude-agent-run : lance un agent Claude Code SANS INTERFACE (-p), en processus séparé.
+# Un modèle, un effort et un compte (abonnement ou clé API) par agent. Voir ../README.md.
+#
+#   claude-agent-run [--agent=<nom>] [--thinking=<niveau>] [options claude…] "<prompt>"
+#
+#   --agent=<nom>    → --agent <CLAUDE_AGENT_PLUGIN>:<nom> si CLAUDE_AGENT_PLUGIN est défini, sinon --agent <nom>.
+#                    « plugin:nom » passe tel quel. --agent=none : aucun agent.
+#                    Sans --agent : CLAUDE_AGENT_DEFAULT s'il est défini, sinon aucun agent.
+#   --thinking=<n>   low|medium|high|xhigh|max → --effort <n> ; enabled|adaptive|disabled → --thinking natif.
+#   Autres options transmises telles quelles (--model, --max-budget-usd, --output-format, --json-schema, -w…).
+#   -p ajouté s'il manque.
+#
+# Configuration (toutes optionnelles) :
+#   CLAUDE_AGENT_CLAUDE      binaire à appeler (défaut : claude). Ex. un shim de passerelle.
+#   CLAUDE_AGENT_CONFIG_DIR  config dir de l'agent (CLAUDE_CONFIG_DIR). Absent : celui du compte connecté.
+#   CLAUDE_AGENT_SETTINGS    fichier --settings (ex. apiKeyHelper pour une clé API).
+#   CLAUDE_AGENT_PLUGIN      préfixe de plugin des agents (ex. brain-build).
+#   CLAUDE_AGENT_DEFAULT     agent par défaut (ex. dev).
+#
+# Testé avec Claude Code 2.1.329. POSIX sh, aucune dépendance.
+
+agent=${CLAUDE_AGENT_DEFAULT:-none}
+effort=
+thinking=
+has_p=0
+n=$#
+i=0
+while [ $i -lt $n ]; do
+  a=$1; shift; i=$((i+1))
+  case $a in
+    --agent=*)    agent=${a#--agent=} ;;
+    --agent)      agent=$1; shift; i=$((i+1)) ;;
+    --thinking=*) v=${a#--thinking=} ;;
+    --thinking)   v=$1; shift; i=$((i+1)) ;;
+    -p|--print)   has_p=1; set -- "$@" "$a" ;;
+    *)            set -- "$@" "$a" ;;
+  esac
+  case $a in
+    --thinking|--thinking=*)
+      case $v in
+        low|medium|high|xhigh|max) effort=$v ;;
+        enabled|adaptive|disabled) thinking=$v ;;
+        *) echo "claude-agent-run : --thinking : low|medium|high|xhigh|max|enabled|adaptive|disabled (reçu « $v »)" >&2; exit 2 ;;
+      esac ;;
+  esac
+done
+
+[ $has_p -eq 1 ] || set -- -p "$@"
+[ -n "$thinking" ] && set -- --thinking "$thinking" "$@"
+[ -n "$effort" ] && set -- --effort "$effort" "$@"
+case $agent in
+  none|"") ;;
+  *:*) set -- --agent "$agent" "$@" ;;
+  *)   set -- --agent "${CLAUDE_AGENT_PLUGIN:+$CLAUDE_AGENT_PLUGIN:}$agent" "$@" ;;
+esac
+[ -n "${CLAUDE_AGENT_SETTINGS:-}" ] && set -- --settings "$CLAUDE_AGENT_SETTINGS" "$@"
+
+# Variables héritées d'une session Claude Code parente (le pilote) : retirées pour que l'agent
+# ouvre sa propre session, avec sa propre authentification, sans rien hériter du routage du pilote.
+set -- env \
+  -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_BASE_URL -u ANTHROPIC_CUSTOM_HEADERS \
+  -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_CHILD_SESSION \
+  -u CLAUDE_CODE_CHILD_NOTES_DIR -u CLAUDE_CODE_SESSION_ATTENDED -u CLAUDE_CODE_MESSAGING_TOKEN \
+  -u CLAUDE_CODE_MESSAGING_SOCKET -u CLAUDE_CODE_EXECPATH -u CLAUDE_PID -u CLAUDE_EFFORT \
+  ${CLAUDE_AGENT_CONFIG_DIR:+CLAUDE_CONFIG_DIR=$CLAUDE_AGENT_CONFIG_DIR} \
+  "${CLAUDE_AGENT_CLAUDE:-claude}" "$@"
+exec "$@"
