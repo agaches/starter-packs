@@ -18,7 +18,12 @@
 #   CLAUDE_AGENT_PLUGIN      préfixe de plugin des agents (ex. brain-build).
 #   CLAUDE_AGENT_DEFAULT     agent par défaut (ex. dev).
 #
-# Testé avec Claude Code 2.1.329. POSIX sh, aucune dépendance.
+# Contrat : stdout = sortie de Claude Code, rien d'autre ; tout autre message va sur stderr.
+#   En --output-format json|stream-json, seules les lignes JSON (commençant par { ou [) restent sur stdout :
+#   le texte qu'un shim de passerelle écrirait sur stdout (bannière de fin de session…) part sur stderr.
+#   Code retour de Claude Code conservé. En text (défaut) : aucun filtre, sortie inchangée.
+#
+# Testé avec Claude Code 2.1.329. POSIX sh + awk, aucune autre dépendance.
 
 agent=${CLAUDE_AGENT_DEFAULT:-none}
 effort=
@@ -56,6 +61,13 @@ case $agent in
 esac
 [ -n "${CLAUDE_AGENT_SETTINGS:-}" ] && set -- --settings "$CLAUDE_AGENT_SETTINGS" "$@"
 
+fmt=text; prev=
+for a in "$@"; do
+  [ "$prev" = --output-format ] && fmt=$a
+  case $a in --output-format=*) fmt=${a#--output-format=} ;; esac
+  prev=$a
+done
+
 # Variables héritées d'une session Claude Code parente (le pilote) : retirées pour que l'agent
 # ouvre sa propre session, avec sa propre authentification, sans rien hériter du routage du pilote.
 set -- env \
@@ -65,4 +77,10 @@ set -- env \
   -u CLAUDE_CODE_MESSAGING_SOCKET -u CLAUDE_CODE_EXECPATH -u CLAUDE_PID -u CLAUDE_EFFORT \
   ${CLAUDE_AGENT_CONFIG_DIR:+CLAUDE_CONFIG_DIR=$CLAUDE_AGENT_CONFIG_DIR} \
   "${CLAUDE_AGENT_CLAUDE:-claude}" "$@"
-exec "$@"
+
+case $fmt in json|stream-json) ;; *) exec "$@" ;; esac
+# Filtre ligne à ligne, code retour de Claude Code conservé (remonté par fd 3).
+exec 4>&1
+rc=$( { { "$@" 3>&- 4>&-; echo $? >&3; } \
+  | awk '/^[{[]/ { print; fflush(); next } { print > "/dev/stderr"; fflush("/dev/stderr") }' >&4 3>&- 4>&-; } 3>&1 )
+exit "${rc:-1}"
